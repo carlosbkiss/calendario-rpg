@@ -168,6 +168,35 @@ input[type="time"], input[type="date"] { font-family: var(--font-mono); font-siz
 details { color: var(--muted); }
 details summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; letter-spacing: .06em; padding: 6px 0; }
 details .list { margin-top: 10px; opacity: .8; }
+.card.q-past, .card.q-arch { opacity: .85; }
+.seg.mini button { padding: 3px 10px; font-size: 12px; }
+.st.veio { background: var(--yes-bg); color: var(--yes); }
+.st.furo { background: var(--no); color: var(--red-ink); }
+.chamada-note { margin: 8px 18px 0; font-style: italic; color: var(--muted); font-size: 15px; }
+.pend-note { padding: 12px 16px; border: 1px solid var(--gold); border-radius: 4px; background: var(--page); }
+.ranking { background: var(--page); border: 1px solid var(--line); border-top: 5px solid var(--red); border-bottom: 5px solid var(--red); border-radius: 2px; box-shadow: 0 6px 18px -8px var(--shadow); padding-bottom: 8px; }
+.rank-head { padding: 16px 18px 10px; display: flex; flex-direction: column; gap: 4px; }
+.rank-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.7rem; color: var(--red); margin: 0; letter-spacing: .02em; }
+.rank-head .sub { font-size: 15px; }
+.ranking .rule { margin: 0 18px; }
+.rank-empty { margin: 12px 18px 0; font-style: italic; color: var(--muted); }
+.rank-list { list-style: none; margin: 0; padding: 6px 0 0; }
+.rank-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 9px 18px; }
+.rank-row + .rank-row { border-top: 1px dotted var(--line); }
+.rank-row.me { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.rank-row:first-child .pos { background: var(--red); color: var(--red-ink); border-color: var(--red); }
+.pos { font-family: var(--font-display); font-weight: 800; width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; font-variant-numeric: tabular-nums; }
+.rank-name { display: flex; flex-direction: column; min-width: 0; }
+.rank-name .nm { font-family: var(--font-display); font-weight: 800; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.rank-name .bd { font-size: 14px; color: var(--muted); font-style: italic; }
+.title { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; padding: 2px 8px; border-radius: 3px; }
+.title.bad { background: var(--no-bg); color: var(--no); }
+.title.good { background: var(--yes-bg); color: var(--yes); }
+.crown-inv { display: inline-block; transform: rotate(180deg); }
+.pts { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.pts b { font-family: var(--font-display); font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.pts small { font-size: 12px; color: var(--muted); }
+h2 { text-wrap: balance; }
 @media (max-width: 560px) {
   header .d20 { width: 48px; height: 48px; }
   .row { grid-template-columns: 1fr; gap: 6px; }
@@ -215,10 +244,16 @@ details .list { margin-top: 10px; opacity: .8; }
   <div class="list" id="list">
     <div class="empty"><strong>Consultando os pergaminhos…</strong>As sessões propostas aparecem aqui.</div>
   </div>
+  <div class="pend-note" id="chamada-pend" hidden></div>
   <details id="past" hidden>
     <summary>Crônicas passadas</summary>
     <div class="list" id="past-list"></div>
   </details>
+  <details id="arch" hidden>
+    <summary>Arquivadas<span id="arch-count"></span></summary>
+    <div class="list" id="arch-list"></div>
+  </details>
+  <section class="ranking" id="ranking" hidden aria-label="Ranking do Ramelão"></section>
 </div>
 
 <script>
@@ -226,6 +261,7 @@ const PEOPLE = ["Henrique", "Luis", "Carlos", "Lira", "Augusto", "Jean", "Vitor"
 const MASTER = "Henrique";
 const DEFAULT_TIME = "20:00";
 const MAX_AUSENCIAS = 2;
+const PTS = { aus: 1, sum: 2, furo: 3 };
 const FILTER_LABEL = { todas: "Mostrando todas as próximas datas", ok: "Mostrando só as que vão rolar", open: "Mostrando só as datas em aberto", off: "Mostrando só as que não vão rolar", me: "Mostrando só as datas que você ainda não respondeu" };
 const EXCUSES = [
   "Meu gato sentou no teclado e eu não tenho coragem de tirar.",
@@ -243,31 +279,20 @@ const EXCUSES = [
   "Falhei no teste de Constituição contra a preguiça."
 ];
 const DIE = '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,4 92,28 92,72 50,96 8,72 8,28" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><polygon points="50,26 74,66 26,66" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/></svg>';
+const READONLY_MSG = "Você só pode ler este pergaminho. Peça ao Carlos acesso para marcar presença.";
 const $ = (s) => document.querySelector(s);
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
 
 let me = store("mesa-me") || null;
 if (!PEOPLE.includes(me)) me = null;
 let db = null, canWrite = true;
-let sessions = new Map();
-let answers = new Map();
+let sessions = new Map();   // date -> {data, modo, arquivada, arquivadaEm, chamada}
+let answers = new Map();    // `${date}__${pessoa}` -> {status, horario, desculpa}
 let loaded = { s: false, r: false };
 let confirmDel = null, confirmClean = false;
 let filter = store("mesa-filtro") || "todas";
 if (!FILTER_LABEL[filter]) filter = "todas";
-function setFilter(f) { filter = f; confirmClean = false; store("mesa-filtro", f); render(); }
-function quorum(sum) {
-  if (sum.yes >= PEOPLE.length - MAX_AUSENCIAS) return "ok";
-  if (sum.no > MAX_AUSENCIAS) return "off";
-  return "open";
-}
-function deleteDate(date) {
-  write("sessoes/" + date, null, "delete");
-  PEOPLE.forEach((p) => { if (answers.has(date + "__" + p)) write("respostas/" + date + "__" + p, null, "delete"); });
-}
-function myPending(date) { return me && !(answers.get(date + "__" + me) || {}).status; }
 const writeChain = new Map();
-const READONLY_MSG = "Você só pode ler este pergaminho. Peça ao Carlos acesso de Colaborador para marcar presença.";
 
 function write(path, body, op = "set") {
   const prev = writeChain.get(path) || Promise.resolve();
@@ -279,12 +304,24 @@ function write(path, body, op = "set") {
   });
   return next;
 }
+function saveSession(date, patch) {
+  const cur = sessions.get(date) || { data: date, modo: "" };
+  const body = { ...cur, ...patch, data: date };
+  Object.keys(body).forEach((k) => { if (body[k] === undefined) delete body[k]; });
+  sessions.set(date, body);
+  return write("sessoes/" + date, body);
+}
+function deleteDate(date) {
+  write("sessoes/" + date, null, "delete");
+  PEOPLE.forEach((p) => { if (answers.has(date + "__" + p)) write("respostas/" + date + "__" + p, null, "delete"); });
+}
+function archive(date, on) { return saveSession(date, on ? { arquivada: true, arquivadaEm: todayISO() } : { arquivada: false, arquivadaEm: undefined }); }
+function setFilter(f) { filter = f; confirmClean = false; store("mesa-filtro", f); render(); }
 
 function showNotice(msg, warn) {
   $("#notice").innerHTML = msg ? `<div class="notice${warn ? " warn" : ""}"></div>` : "";
   if (msg) $("#notice .notice").textContent = msg;
 }
-
 function todayISO() {
   const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
@@ -297,22 +334,9 @@ function fmtDate(iso) {
     wk: dt.toLocaleDateString("pt-BR", { weekday: "long" }) + (y !== new Date().getFullYear() ? " · " + y : "")
   };
 }
-
-function renderPeople() {
-  const box = $("#people"); box.innerHTML = "";
-  PEOPLE.forEach((p) => {
-    const b = document.createElement("button");
-    b.className = "chip"; b.type = "button"; b.id = "who-" + p;
-    b.setAttribute("aria-pressed", String(p === me));
-    b.textContent = p;
-    if (p === MASTER) { const c = document.createElement("span"); c.className = "crown"; c.textContent = "♛ Mestre"; b.append(c); }
-    b.onclick = () => { me = p; store("mesa-me", p); renderPeople(); render(); };
-    box.append(b);
-  });
-}
-
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function stat(k, v, mono) { const s = el("div", "stat"); s.append(el("span", "k", k), el("span", "v" + (mono ? " mono" : ""), v)); return s; }
+function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
 
 function summary(date) {
   let yes = [], no = 0;
@@ -324,73 +348,135 @@ function summary(date) {
   const times = yes.filter(Boolean).sort();
   return { yes: yes.length, no, pend: PEOPLE.length - yes.length - no, start: times.length ? times[times.length - 1] : "" };
 }
-
+function quorum(sum) {
+  if (sum.yes >= PEOPLE.length - MAX_AUSENCIAS) return "ok";
+  if (sum.no > MAX_AUSENCIAS) return "off";
+  return "open";
+}
+function chamadaInfo(s) {
+  const ch = s.chamada || {};
+  const marked = PEOPLE.filter((p) => ch[p]).length, veio = PEOPLE.filter((p) => ch[p] === "veio").length;
+  return { ch, marked, veio, done: marked === PEOPLE.length };
+}
+function myPending(date) { return me && !(answers.get(date + "__" + me) || {}).status; }
 function modoLabel(m) { return m === "presencial" ? "Presencial · na taverna" : m === "online" ? "On-line · pelo portal" : "Formato a definir"; }
 
+function computeRanking(all) {
+  const today = todayISO();
+  const R = Object.fromEntries(PEOPLE.map((p) => [p, { p, aus: 0, sum: 0, furo: 0, veio: 0, pts: 0 }]));
+  all.forEach((s) => {
+    const past = s.data < today;
+    // a date archived before it happened doesn't punish silence
+    const silenceCounts = past && (!s.arquivada || !s.arquivadaEm || s.arquivadaEm > s.data);
+    const ch = s.chamada || {};
+    PEOPLE.forEach((p) => {
+      const a = answers.get(s.data + "__" + p) || {}, c = ch[p], r = R[p];
+      if (c === "veio") { r.veio++; return; }
+      if (a.status === "nao") r.aus++;
+      else if (a.status === "sim" && c === "faltou") r.furo++;
+      else if (!a.status && silenceCounts) r.sum++;
+    });
+  });
+  const list = Object.values(R);
+  list.forEach((r) => { r.pts = r.aus * PTS.aus + r.sum * PTS.sum + r.furo * PTS.furo; });
+  list.sort((a, b) => b.pts - a.pts || b.furo - a.furo || a.veio - b.veio || a.p.localeCompare(b.p));
+  return list;
+}
+
+function renderPeople() {
+  const box = $("#people"); box.innerHTML = "";
+  PEOPLE.forEach((p) => {
+    const b = el("button", "chip", p); b.type = "button"; b.id = "who-" + p;
+    b.setAttribute("aria-pressed", String(p === me));
+    if (p === MASTER) b.append(el("span", "crown", "♛ Mestre"));
+    b.onclick = () => { me = p; store("mesa-me", p); renderPeople(); render(); };
+    box.append(b);
+  });
+}
+
 function card(date, s) {
-  const f = fmtDate(date), sum = summary(date), q = quorum(sum);
-  const c = el("article", "card q-" + q);
+  const today = todayISO(), past = date < today, arch = !!s.arquivada;
+  const f = fmtDate(date), sum = summary(date), q = quorum(sum), ci = chamadaInfo(s);
+  const isMaster = me === MASTER && canWrite;
+  const c = el("article", "card " + (arch ? "q-arch" : past ? "q-past" : "q-" + q));
   const head = el("div", "card-head");
   const when = el("div", "when");
-  const need = PEOPLE.length - MAX_AUSENCIAS - sum.yes;
-  when.append(el("span", "tag-best " + q, q === "ok" ? "✦ Vai rolar" : q === "off" ? "✕ Não vai rolar" : `Em aberto · falta${need > 1 ? "m" : ""} ${need} presença${need > 1 ? "s" : ""}`));
-  when.append(el("span", "day", f.day), el("span", "wk", f.wk));
+  let tag, tcls;
+  if (arch) { tag = "Arquivada"; tcls = "open"; }
+  else if (past) {
+    if (ci.done) { tag = `✦ Chamada feita · ${plural(ci.veio, "presente", "presentes")}`; tcls = ci.veio >= PEOPLE.length - MAX_AUSENCIAS ? "ok" : "open"; }
+    else if (q === "ok" || ci.marked) { tag = `Aguardando chamada do mestre (${ci.marked}/${PEOPLE.length})`; tcls = "open"; }
+    else { tag = "✕ Não rolou"; tcls = "off"; }
+  } else {
+    const need = PEOPLE.length - MAX_AUSENCIAS - sum.yes;
+    tag = q === "ok" ? "✦ Vai rolar" : q === "off" ? "✕ Não vai rolar" : `Em aberto · falta${need > 1 ? "m" : ""} ${plural(need, "presença", "presenças")}`;
+    tcls = q;
+  }
+  when.append(el("span", "tag-best " + tcls, tag), el("span", "day", f.day), el("span", "wk", f.wk));
   const modo = el("div", "modo");
-  if (me === MASTER && canWrite) {
+  if (isMaster && !past && !arch) {
     const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Formato da sessão");
     [["presencial", "Presencial"], ["online", "On-line"]].forEach(([v, l]) => {
       const b = el("button", "", l); b.type = "button"; b.id = `modo-${date}-${v}`;
       b.setAttribute("aria-pressed", String(s.modo === v));
-      b.onclick = () => write("sessoes/" + date, { data: date, modo: s.modo === v ? "" : v });
+      b.onclick = () => saveSession(date, { modo: s.modo === v ? "" : v });
       seg.append(b);
     });
     modo.append(seg);
-  } else {
-    modo.append(el("span", "pill " + (s.modo || ""), modoLabel(s.modo)));
-  }
+  } else modo.append(el("span", "pill " + (s.modo || ""), modoLabel(s.modo)));
   head.append(when, modo);
   c.append(head, el("hr", "rule"));
 
   const sm = el("div", "summary");
-  sm.append(stat("Presentes", `${sum.yes} / ${PEOPLE.length}`), stat("Ausentes", String(sum.no)), stat("Sem resposta", String(sum.pend)));
-  if (sum.start) sm.append(stat("Mesa completa às", sum.start, true));
+  sm.append(stat("Confirmados", `${sum.yes} / ${PEOPLE.length}`), stat("Ausentes", String(sum.no)), stat("Sem resposta", String(sum.pend)));
+  if (ci.marked) sm.append(stat("Compareceram", `${ci.veio} / ${PEOPLE.length}`));
+  else if (sum.start) sm.append(stat("Mesa completa às", sum.start, true));
   c.append(sm, el("hr", "rule"));
 
+  if (isMaster && past && !arch) {
+    const note = el("p", "chamada-note", ci.done ? "Chamada fechada. Dá para corrigir clicando de novo." : "Chamada do mestre: marque quem veio e quem faltou. Quem confirmou e faltou leva furo no ranking.");
+    c.append(note);
+  }
   const rows = el("div", "rows");
-  PEOPLE.forEach((p) => rows.append(row(date, p)));
+  PEOPLE.forEach((p) => rows.append(row(date, s, p, { past, arch, isMaster, ch: ci.ch })));
   c.append(rows);
 
-  if (me === MASTER && canWrite) {
+  if (isMaster || (arch && canWrite)) {
     const foot = el("div", "card-foot");
-    const del = el("button", "link danger", confirmDel === date ? "Confirmar: apagar esta data e as respostas" : "Remover data");
-    del.type = "button"; del.id = "del-" + date;
-    del.onclick = () => {
-      if (confirmDel !== date) { confirmDel = date; render(); return; }
-      confirmDel = null;
-      deleteDate(date);
-    };
-    foot.append(del); c.append(foot);
+    if (!arch) {
+      const b = el("button", "link", "Arquivar data"); b.type = "button"; b.id = "arch-" + date;
+      b.onclick = () => archive(date, true); foot.append(b);
+    } else {
+      const b = el("button", "link", "Desarquivar"); b.type = "button"; b.id = "unarch-" + date;
+      b.onclick = () => archive(date, false); foot.append(b);
+      if (isMaster) {
+        const del = el("button", "link danger", confirmDel === date ? "Confirmar: apagar de vez (sai do ranking)" : "Apagar de vez");
+        del.type = "button"; del.id = "del-" + date;
+        del.onclick = () => { if (confirmDel !== date) { confirmDel = date; render(); return; } confirmDel = null; deleteDate(date); };
+        foot.append(del);
+      }
+    }
+    c.append(foot);
   }
   return c;
 }
 
-function row(date, p) {
+function row(date, s, p, ctx) {
   const key = date + "__" + p, a = answers.get(key) || {};
-  const isMe = p === me && canWrite;
+  const editable = p === me && canWrite && !ctx.past && !ctx.arch;
   const r = el("div", "row" + (p === me ? " me" : ""));
   const who = el("div", "who", p);
   if (p === MASTER) who.title = "Mestre";
   if (p === me) who.append(el("span", "you", "você"));
   r.append(who);
   const st = el("div", "state");
-  const path = "respostas/" + key;
   const save = (patch) => {
     const cur = answers.get(key) || {};
     const body = { data: date, pessoa: p, status: cur.status || "", horario: cur.horario || "", desculpa: cur.desculpa || "", ...patch, atualizado: new Date().toISOString() };
     answers.set(key, body);
-    return write(path, body);
+    return write("respostas/" + key, body);
   };
-  if (isMe) {
+  if (editable) {
     const ch = el("div", "choice"); ch.setAttribute("role", "group"); ch.setAttribute("aria-label", "Você pode?");
     [["sim", "Posso"], ["nao", "Não posso"]].forEach(([v, l]) => {
       const b = el("button", v, l); b.type = "button"; b.id = `st-${key}-${v}`;
@@ -415,52 +501,36 @@ function row(date, p) {
       t.onchange = () => save({ desculpa: t.value.trim() });
       const dice = el("button", "dice"); dice.type = "button"; dice.id = "dice-" + key;
       dice.innerHTML = DIE + "Rolar desculpa";
-      dice.onclick = () => { const e = EXCUSES[Math.floor(Math.random() * EXCUSES.length)]; save({ desculpa: e }); render(); };
+      dice.onclick = () => { save({ desculpa: EXCUSES[Math.floor(Math.random() * EXCUSES.length)] }); render(); };
       w.append(t, dice); st.append(w);
     }
   } else {
     if (a.status === "sim") {
-      st.append(el("span", "st sim", "Presente"));
+      st.append(el("span", "st sim", "Confirmou"));
       st.append(el("span", "time", "a partir de " + (a.horario || DEFAULT_TIME)));
     } else if (a.status === "nao") {
       st.append(el("span", "st nao", "Ausente"));
       st.append(el("span", "excuse", a.desculpa ? "“" + a.desculpa + "”" : "fugiu sem dar desculpa…"));
-    } else st.append(el("span", "st pend", "Não rolou iniciativa"));
+    } else st.append(el("span", "st pend", ctx.past ? "Sumiu" : "Não rolou iniciativa"));
   }
+  const c = ctx.ch[p];
+  if (ctx.isMaster && ctx.past && !ctx.arch) {
+    const seg = el("div", "seg mini"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Chamada de " + p);
+    [["veio", "Veio"], ["faltou", "Faltou"]].forEach(([v, l]) => {
+      const b = el("button", "", l); b.type = "button"; b.id = `ch-${key}-${v}`;
+      b.setAttribute("aria-pressed", String(c === v));
+      b.onclick = () => {
+        const next = { ...(s.chamada || {}) };
+        if (c === v) delete next[p]; else next[p] = v;
+        saveSession(date, { chamada: next }); render();
+      };
+      seg.append(b);
+    });
+    st.append(seg);
+  } else if (c === "veio") st.append(el("span", "st veio", "✓ Compareceu"));
+  else if (c === "faltou") st.append(el("span", "st furo", a.status === "sim" ? "Furou!" : "Faltou"));
   r.append(st);
   return r;
-}
-
-function render() {
-  const act = document.activeElement, actId = act && act.id, typing = act && act.tagName === "INPUT" && act.type === "text" ? { v: act.value, s: act.selectionStart } : null;
-  $("#add-sec").hidden = !canWrite || !db;
-  const list = $("#list"), past = $("#past-list");
-  if (!db) return;
-  if (!loaded.s || !loaded.r) return;
-  list.innerHTML = ""; past.innerHTML = "";
-  if (!me) list.append(el("div", "notice", "Escolha seu aventureiro acima para marcar presença."));
-  const today = todayISO();
-  const all = [...sessions.values()].sort((x, y) => x.data.localeCompare(y.data));
-  const up = all.filter((s) => s.data >= today), old = all.filter((s) => s.data < today).reverse();
-  const qs = up.map((s) => { const sum = summary(s.data); return { s, sum, q: quorum(sum) }; });
-  renderBigs(qs);
-  renderToolbar(qs);
-  if (!up.length) {
-    const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma sessão convocada</strong>";
-    e.append(canWrite ? "Use “Propor uma sessão” acima para abrir a próxima aventura." : "Assim que alguém convocar a mesa, a data aparece aqui.");
-    list.append(e);
-  }
-  else {
-    const shown = qs.filter((o) => filter === "todas" || (filter === "me" ? myPending(o.s.data) : o.q === filter));
-    if (!shown.length) list.append(el("div", "empty", "Nenhuma data neste filtro."));
-    shown.forEach((o) => list.append(card(o.s.data, o.s)));
-  }
-  old.forEach((s) => past.append(card(s.data, s)));
-  $("#past").hidden = !old.length;
-  if (actId) {
-    const n = document.getElementById(actId);
-    if (n) { n.focus(); if (typing && n.type === "text") { n.value = typing.v; try { n.setSelectionRange(typing.s, typing.s); } catch (e) {} } }
-  }
 }
 
 function big(key, label, n, hint, disabled) {
@@ -490,10 +560,87 @@ function renderToolbar(qs) {
   const off = qs.filter((o) => o.q === "off");
   if (off.length && canWrite) {
     const n = off.length, pl = n > 1 ? "s" : "";
-    const c = el("button", "btn ghost", confirmClean ? `Confirmar: apagar ${n} data${pl} e respostas` : `Limpar ${n} data${pl} que não vão rolar`);
+    const c = el("button", "btn ghost", confirmClean ? `Confirmar: arquivar ${n} data${pl}` : `Arquivar ${n} data${pl} que não vão rolar`);
     c.type = "button"; c.id = "clean";
-    c.onclick = () => { if (!confirmClean) { confirmClean = true; render(); return; } confirmClean = false; off.forEach((o) => deleteDate(o.s.data)); };
+    c.onclick = () => { if (!confirmClean) { confirmClean = true; render(); return; } confirmClean = false; off.forEach((o) => archive(o.s.data, true)); };
     bar.append(c);
+  }
+}
+function renderRanking(all) {
+  const box = $("#ranking"); box.hidden = false; box.innerHTML = "";
+  const list = computeRanking(all);
+  const head = el("div", "rank-head");
+  head.append(el("span", "eyebrow", "Hall da vergonha"), el("h2", "", "Ranking do Ramelão"));
+  head.append(el("p", "sub", `Ausência vale ${PTS.aus} ponto, sumiço (não respondeu até o dia) vale ${PTS.sum}, e furo (confirmou e não veio, pela chamada do mestre) vale ${PTS.furo}. Quem compareceu não pontua naquela data.`));
+  box.append(head, el("hr", "rule"));
+  const anyPts = list.some((r) => r.pts > 0);
+  if (!anyPts) box.append(el("p", "rank-empty", "Ninguém ramelou ainda. Por enquanto."));
+  const minPts = Math.min(...list.map((r) => r.pts));
+  const paladins = list.filter((r) => r.pts === minPts);
+  const maxVeio = Math.max(...paladins.map((r) => r.veio));
+  const paladin = anyPts ? paladins.find((r) => r.veio === maxVeio) : null;
+  const ol = el("ol", "rank-list");
+  list.forEach((r, i) => {
+    const li = el("li", "rank-row" + (r.p === me ? " me" : ""));
+    li.append(el("span", "pos", String(i + 1)));
+    const nm = el("div", "rank-name");
+    const line = el("span", "nm", r.p);
+    if (i === 0 && r.pts > 0) { const t = el("span", "title bad"); t.append(el("span", "crown-inv", "♛"), " Ramelão Supremo"); line.append(t); }
+    else if (paladin && r.p === paladin.p) line.append(el("span", "title good", "✦ Paladino da Assiduidade"));
+    nm.append(line, el("span", "bd", `${plural(r.aus, "ausência", "ausências")} · ${plural(r.sum, "sumiço", "sumiços")} · ${plural(r.furo, "furo", "furos")} · ${plural(r.veio, "presença", "presenças")}`));
+    li.append(nm);
+    const pts = el("span", "pts"); pts.append(el("b", "", String(r.pts)), el("small", "", r.pts === 1 ? "ponto" : "pontos"));
+    li.append(pts);
+    ol.append(li);
+  });
+  box.append(ol);
+}
+
+function render() {
+  const act = document.activeElement, actId = act && act.id, typing = act && act.tagName === "INPUT" && act.type === "text" ? { v: act.value, s: act.selectionStart } : null;
+  $("#add-sec").hidden = !canWrite || !db;
+  const list = $("#list"), past = $("#past-list"), arch = $("#arch-list");
+  if (!db || !loaded.s || !loaded.r) return;
+  list.innerHTML = ""; past.innerHTML = ""; arch.innerHTML = "";
+  if (!me) list.append(el("div", "notice", "Escolha seu aventureiro acima para marcar presença."));
+  const today = todayISO();
+  const all = [...sessions.values()].sort((x, y) => x.data.localeCompare(y.data));
+  const active = all.filter((s) => !s.arquivada);
+  const up = active.filter((s) => s.data >= today);
+  const old = active.filter((s) => s.data < today).reverse();
+  const archived = all.filter((s) => s.arquivada).reverse();
+  const qs = up.map((s) => { const sum = summary(s.data); return { s, sum, q: quorum(sum) }; });
+  renderBigs(qs);
+  renderToolbar(qs);
+  if (!up.length) {
+    const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma sessão convocada</strong>";
+    e.append(canWrite ? "Use “Propor uma sessão” acima para abrir a próxima aventura." : "Assim que alguém convocar a mesa, a data aparece aqui.");
+    list.append(e);
+  } else {
+    const shown = qs.filter((o) => filter === "todas" || (filter === "me" ? myPending(o.s.data) : o.q === filter));
+    if (!shown.length) list.append(el("div", "empty", "Nenhuma data neste filtro."));
+    shown.forEach((o) => list.append(card(o.s.data, o.s)));
+  }
+  // master: past sessions waiting for roll call
+  const pendCh = old.filter((s) => { const ci = chamadaInfo(s); return !ci.done && (quorum(summary(s.data)) === "ok" || ci.marked); });
+  const pn = $("#chamada-pend");
+  pn.hidden = !(me === MASTER && canWrite && pendCh.length);
+  if (!pn.hidden) {
+    pn.innerHTML = "";
+    pn.append(`Mestre, ${pendCh.length === 1 ? "falta a chamada de 1 sessão" : `faltam as chamadas de ${pendCh.length} sessões`}. `);
+    const b = el("button", "link", "Fazer chamada"); b.type = "button"; b.id = "go-chamada";
+    b.onclick = () => { $("#past").open = true; $("#past").scrollIntoView({ behavior: "smooth", block: "start" }); };
+    pn.append(b);
+  }
+  old.forEach((s) => past.append(card(s.data, s)));
+  archived.forEach((s) => arch.append(card(s.data, s)));
+  $("#past").hidden = !old.length;
+  $("#arch").hidden = !archived.length;
+  $("#arch-count").textContent = archived.length ? ` (${archived.length})` : "";
+  renderRanking(all);
+  if (actId) {
+    const n = document.getElementById(actId);
+    if (n) { n.focus(); if (typing && n.type === "text") { n.value = typing.v; try { n.setSelectionRange(typing.s, typing.s); } catch (e) {} } }
   }
 }
 
@@ -501,10 +648,14 @@ $("#add-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const v = $("#new-date").value;
   if (!v) return;
-  if (sessions.has(v)) { $("#add-status").textContent = "Essa data já está no quadro."; return; }
+  const ex = sessions.get(v);
+  if (ex && !ex.arquivada) { $("#add-status").textContent = "Essa data já está no quadro."; return; }
   $("#add-btn").disabled = true;
-  try { await write("sessoes/" + v, { data: v, modo: "" }); $("#add-status").textContent = "A mesa foi convocada."; $("#new-date").value = ""; }
-  catch (e) {}
+  try {
+    if (ex) await archive(v, false); else await write("sessoes/" + v, { data: v, modo: "" });
+    $("#add-status").textContent = ex ? "A data saiu do arquivo e voltou ao quadro." : "A mesa foi convocada.";
+    $("#new-date").value = "";
+  } catch (e) {}
   $("#add-btn").disabled = false;
 });
 
