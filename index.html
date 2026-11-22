@@ -97,7 +97,31 @@ input[type="time"], input[type="date"] { font-family: var(--font-mono); font-siz
   box-shadow: 0 6px 18px -8px var(--shadow);
   border-top: 5px solid var(--gold); border-bottom: 5px solid var(--gold);
 }
-.card.best { outline: 2px solid var(--gold); outline-offset: 3px; }
+.card.q-ok { outline: 2px solid var(--gold); outline-offset: 3px; }
+.card.q-off { opacity: .72; }
+.tag-best.open { color: var(--muted); }
+.tag-best.off { color: var(--no); }
+.btn.ghost { background: transparent; color: var(--red); border: 1px solid var(--red); box-shadow: none; }
+.bigs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.big {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; color: var(--ink);
+  background: var(--page); border: 1px solid var(--line); border-top: 4px solid var(--line); border-radius: 2px;
+  padding: 12px 14px; box-shadow: 0 4px 12px -8px var(--shadow);
+}
+.big:hover:not(:disabled) { border-color: var(--gold); }
+.big:disabled { cursor: default; }
+.big[aria-pressed="true"] { outline: 2px solid var(--gold); outline-offset: 2px; }
+.big.ok { border-top-color: var(--yes); }
+.big.open { border-top-color: var(--gold); }
+.big.off { border-top-color: var(--no); }
+.big.me { border-top-color: var(--red); }
+.big .k { font-family: var(--font-display); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--red); font-weight: 800; }
+.big .n { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.big.ok .n { color: var(--yes); }
+.big.off .n { color: var(--no); }
+.big .hint { font-size: 14px; font-style: italic; color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.toolbar .btn { margin-left: auto; }
 .card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 18px 10px; }
 .when { display: flex; flex-direction: column; gap: 2px; }
 .when .day { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; line-height: 1.05; color: var(--red); letter-spacing: .02em; }
@@ -165,7 +189,7 @@ details .list { margin-top: 10px; opacity: .8; }
     <div class="titles">
       <span class="eyebrow">Convocação da guilda</span>
       <h1>Calendário da Mesa</h1>
-      <p class="sub">Aventureiro, escolha seu nome, diga se comparece em cada data e a partir de que hora. O horário padrão é a partir das 20:00. Se não puder vir, declare sua desculpa (o mestre julgará). O mestre decide se a sessão é na taverna ou pelo portal on-line.</p>
+      <p class="sub">Aventureiro, escolha seu nome, diga se comparece em cada data e a partir de que hora. O horário padrão é a partir das 20:00. Com até 2 ausências, a sessão rola. Se não puder vir, declare sua desculpa (o mestre julgará). O mestre decide se a sessão é na taverna ou pelo portal on-line.</p>
     </div>
   </header>
 
@@ -186,6 +210,8 @@ details .list { margin-top: 10px; opacity: .8; }
   </section>
 
   <div id="notice"></div>
+  <section class="bigs" id="bigs" hidden aria-label="Resumo das sessões"></section>
+  <div class="toolbar" id="toolbar" hidden></div>
   <div class="list" id="list">
     <div class="empty"><strong>Consultando os pergaminhos…</strong>As sessões propostas aparecem aqui.</div>
   </div>
@@ -199,6 +225,8 @@ details .list { margin-top: 10px; opacity: .8; }
 const PEOPLE = ["Henrique", "Luis", "Carlos", "Lira", "Augusto", "Jean", "Vitor"];
 const MASTER = "Henrique";
 const DEFAULT_TIME = "20:00";
+const MAX_AUSENCIAS = 2;
+const FILTER_LABEL = { todas: "Mostrando todas as próximas datas", ok: "Mostrando só as que vão rolar", open: "Mostrando só as datas em aberto", off: "Mostrando só as que não vão rolar", me: "Mostrando só as datas que você ainda não respondeu" };
 const EXCUSES = [
   "Meu gato sentou no teclado e eu não tenho coragem de tirar.",
   "Vou ajudar minha tia a montar um guarda-roupa sem manual.",
@@ -224,7 +252,20 @@ let db = null, canWrite = true;
 let sessions = new Map();
 let answers = new Map();
 let loaded = { s: false, r: false };
-let confirmDel = null;
+let confirmDel = null, confirmClean = false;
+let filter = store("mesa-filtro") || "todas";
+if (!FILTER_LABEL[filter]) filter = "todas";
+function setFilter(f) { filter = f; confirmClean = false; store("mesa-filtro", f); render(); }
+function quorum(sum) {
+  if (sum.yes >= PEOPLE.length - MAX_AUSENCIAS) return "ok";
+  if (sum.no > MAX_AUSENCIAS) return "off";
+  return "open";
+}
+function deleteDate(date) {
+  write("sessoes/" + date, null, "delete");
+  PEOPLE.forEach((p) => { if (answers.has(date + "__" + p)) write("respostas/" + date + "__" + p, null, "delete"); });
+}
+function myPending(date) { return me && !(answers.get(date + "__" + me) || {}).status; }
 const writeChain = new Map();
 const READONLY_MSG = "Você só pode ler este pergaminho. Peça ao Carlos acesso de Colaborador para marcar presença.";
 
@@ -286,12 +327,13 @@ function summary(date) {
 
 function modoLabel(m) { return m === "presencial" ? "Presencial · na taverna" : m === "online" ? "On-line · pelo portal" : "Formato a definir"; }
 
-function card(date, s, isBest) {
-  const f = fmtDate(date), sum = summary(date);
-  const c = el("article", "card" + (isBest ? " best" : ""));
+function card(date, s) {
+  const f = fmtDate(date), sum = summary(date), q = quorum(sum);
+  const c = el("article", "card q-" + q);
   const head = el("div", "card-head");
   const when = el("div", "when");
-  if (isBest) when.append(el("span", "tag-best", "✦ Melhor data até agora"));
+  const need = PEOPLE.length - MAX_AUSENCIAS - sum.yes;
+  when.append(el("span", "tag-best " + q, q === "ok" ? "✦ Vai rolar" : q === "off" ? "✕ Não vai rolar" : `Em aberto · falta${need > 1 ? "m" : ""} ${need} presença${need > 1 ? "s" : ""}`));
   when.append(el("span", "day", f.day), el("span", "wk", f.wk));
   const modo = el("div", "modo");
   if (me === MASTER && canWrite) {
@@ -325,8 +367,7 @@ function card(date, s, isBest) {
     del.onclick = () => {
       if (confirmDel !== date) { confirmDel = date; render(); return; }
       confirmDel = null;
-      write("sessoes/" + date, null, "delete");
-      PEOPLE.forEach((p) => { if (answers.has(date + "__" + p)) write("respostas/" + date + "__" + p, null, "delete"); });
+      deleteDate(date);
     };
     foot.append(del); c.append(foot);
   }
@@ -401,19 +442,58 @@ function render() {
   const today = todayISO();
   const all = [...sessions.values()].sort((x, y) => x.data.localeCompare(y.data));
   const up = all.filter((s) => s.data >= today), old = all.filter((s) => s.data < today).reverse();
-  let best = null, bestScore = -1;
-  up.forEach((s) => { const sm = summary(s.data); if (sm.yes > bestScore && sm.yes >= 2) { bestScore = sm.yes; best = s.data; } });
+  const qs = up.map((s) => { const sum = summary(s.data); return { s, sum, q: quorum(sum) }; });
+  renderBigs(qs);
+  renderToolbar(qs);
   if (!up.length) {
     const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma sessão convocada</strong>";
     e.append(canWrite ? "Use “Propor uma sessão” acima para abrir a próxima aventura." : "Assim que alguém convocar a mesa, a data aparece aqui.");
     list.append(e);
   }
-  up.forEach((s) => list.append(card(s.data, s, s.data === best)));
-  old.forEach((s) => past.append(card(s.data, s, false)));
+  else {
+    const shown = qs.filter((o) => filter === "todas" || (filter === "me" ? myPending(o.s.data) : o.q === filter));
+    if (!shown.length) list.append(el("div", "empty", "Nenhuma data neste filtro."));
+    shown.forEach((o) => list.append(card(o.s.data, o.s)));
+  }
+  old.forEach((s) => past.append(card(s.data, s)));
   $("#past").hidden = !old.length;
   if (actId) {
     const n = document.getElementById(actId);
     if (n) { n.focus(); if (typing && n.type === "text") { n.value = typing.v; try { n.setSelectionRange(typing.s, typing.s); } catch (e) {} } }
+  }
+}
+
+function big(key, label, n, hint, disabled) {
+  const b = el("button", "big " + key); b.type = "button"; b.id = "big-" + key;
+  b.setAttribute("aria-pressed", String(filter === key));
+  b.disabled = !!disabled;
+  b.append(el("span", "k", label), el("span", "n", String(n)), el("span", "hint", hint));
+  b.onclick = () => setFilter(filter === key ? "todas" : key);
+  return b;
+}
+function renderBigs(qs) {
+  const box = $("#bigs"); box.hidden = false; box.innerHTML = "";
+  const ok = qs.filter((o) => o.q === "ok"), open = qs.filter((o) => o.q === "open"), off = qs.filter((o) => o.q === "off");
+  const nf = ok[0] && fmtDate(ok[0].s.data);
+  const mine = me ? qs.filter((o) => myPending(o.s.data)).length : null;
+  box.append(
+    big("ok", "Vão rolar", ok.length, nf ? `Próxima: ${nf.day}, ${nf.wk.split(" ")[0]}` : "Nenhuma com quórum ainda"),
+    big("open", "Em aberto", open.length, open.length ? "Ainda dá para fechar quórum" : "Nada pendente"),
+    big("off", "Não vão rolar", off.length, `${MAX_AUSENCIAS + 1} ou mais ausências`),
+    big("me", "Faltam suas respostas", mine == null ? "—" : mine, me ? (mine ? "Toque para ver quais" : "Você respondeu tudo") : "Escolha seu aventureiro", !me)
+  );
+}
+function renderToolbar(qs) {
+  const bar = $("#toolbar"); bar.hidden = !qs.length; bar.innerHTML = "";
+  bar.append(el("span", "status-line", FILTER_LABEL[filter]));
+  if (filter !== "todas") { const b = el("button", "link", "Ver todas"); b.type = "button"; b.id = "f-all"; b.onclick = () => setFilter("todas"); bar.append(b); }
+  const off = qs.filter((o) => o.q === "off");
+  if (off.length && canWrite) {
+    const n = off.length, pl = n > 1 ? "s" : "";
+    const c = el("button", "btn ghost", confirmClean ? `Confirmar: apagar ${n} data${pl} e respostas` : `Limpar ${n} data${pl} que não vão rolar`);
+    c.type = "button"; c.id = "clean";
+    c.onclick = () => { if (!confirmClean) { confirmClean = true; render(); return; } confirmClean = false; off.forEach((o) => deleteDate(o.s.data)); };
+    bar.append(c);
   }
 }
 
