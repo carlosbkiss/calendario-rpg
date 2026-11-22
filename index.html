@@ -165,7 +165,7 @@ details .list { margin-top: 10px; opacity: .8; }
     <div class="titles">
       <span class="eyebrow">Convocação da guilda</span>
       <h1>Calendário da Mesa</h1>
-      <p class="sub">Aventureiro, escolha seu nome, diga se comparece em cada data e a partir de que hora. Se não puder vir, declare sua desculpa (o mestre julgará). O mestre decide se a sessão é na taverna ou pelo portal on-line.</p>
+      <p class="sub">Aventureiro, escolha seu nome, diga se comparece em cada data e a partir de que hora. O horário padrão é a partir das 20:00. Se não puder vir, declare sua desculpa (o mestre julgará). O mestre decide se a sessão é na taverna ou pelo portal on-line.</p>
     </div>
   </header>
 
@@ -198,6 +198,7 @@ details .list { margin-top: 10px; opacity: .8; }
 <script>
 const PEOPLE = ["Henrique", "Luis", "Carlos", "Lira", "Augusto", "Jean", "Vitor"];
 const MASTER = "Henrique";
+const DEFAULT_TIME = "20:00";
 const EXCUSES = [
   "Meu gato sentou no teclado e eu não tenho coragem de tirar.",
   "Vou ajudar minha tia a montar um guarda-roupa sem manual.",
@@ -276,7 +277,7 @@ function summary(date) {
   let yes = [], no = 0;
   PEOPLE.forEach((p) => {
     const a = answers.get(date + "__" + p);
-    if (a && a.status === "sim") yes.push(a.horario || "");
+    if (a && a.status === "sim") yes.push(a.horario || DEFAULT_TIME);
     else if (a && a.status === "nao") no++;
   });
   const times = yes.filter(Boolean).sort();
@@ -353,14 +354,18 @@ function row(date, p) {
     [["sim", "Posso"], ["nao", "Não posso"]].forEach(([v, l]) => {
       const b = el("button", v, l); b.type = "button"; b.id = `st-${key}-${v}`;
       b.setAttribute("aria-pressed", String(a.status === v));
-      b.onclick = () => { save({ status: a.status === v ? "" : v }); render(); };
+      b.onclick = () => {
+        const patch = { status: a.status === v ? "" : v };
+        if (patch.status === "sim" && !a.horario) patch.horario = DEFAULT_TIME;
+        save(patch); render();
+      };
       ch.append(b);
     });
     st.append(ch);
     if (a.status === "sim") {
       const w = el("label", "inline"); w.append(el("span", "", "a partir de"));
-      const t = el("input"); t.type = "time"; t.id = "h-" + key; t.value = a.horario || ""; t.step = 900;
-      t.onchange = () => save({ horario: t.value });
+      const t = el("input"); t.type = "time"; t.id = "h-" + key; t.value = a.horario || DEFAULT_TIME; t.step = 900;
+      t.onchange = () => save({ horario: t.value || DEFAULT_TIME });
       w.append(t); st.append(w);
     } else if (a.status === "nao") {
       const w = el("span", "inline");
@@ -375,7 +380,7 @@ function row(date, p) {
   } else {
     if (a.status === "sim") {
       st.append(el("span", "st sim", "Presente"));
-      st.append(el("span", "time", a.horario ? "a partir de " + a.horario : "horário livre"));
+      st.append(el("span", "time", "a partir de " + (a.horario || DEFAULT_TIME)));
     } else if (a.status === "nao") {
       st.append(el("span", "st nao", "Ausente"));
       st.append(el("span", "excuse", a.desculpa ? "“" + a.desculpa + "”" : "fugiu sem dar desculpa…"));
