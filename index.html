@@ -1,154 +1,196 @@
 <title>Calendário da Mesa</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Karla:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cinzel+Decorative:wght@700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-/* Layout: um quadro de avisos da taverna — seletor de jogador no topo, uma ficha por data de sessão, cada ficha com a linha de todos os 7 jogadores. */
+/* Layout: um livro de regras de fantasia aberto na mesa — página de pergaminho, cada data vira um "bloco de estatísticas" com filetes vermelhos, e os 7 aventureiros listados como atributos. No escuro: masmorra iluminada por tocha. */
 :root {
-  --bg: #eef1ee;
-  --panel: #ffffff;
-  --ink: #1b2422;
-  --muted: #5c6b67;
-  --line: #d3dbd8;
-  --accent: #1f6f63;
-  --accent-ink: #ffffff;
-  --gold: #a9741c;
-  --yes: #2d7a3e;
-  --yes-bg: #e2f1e5;
-  --no: #b0372c;
-  --no-bg: #f8e4e1;
-  --wait-bg: #eceeec;
-  --font-display: "Grenze Gotisch", "Palatino Linotype", Georgia, serif;
-  --font-body: "Karla", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bg: #e9dcc0;
+  --page: #f6eedb;
+  --ink: #2a1a12;
+  --muted: #6e5643;
+  --line: #cdb48e;
+  --red: #8c1c13;
+  --red-ink: #fbf3e2;
+  --gold: #a8761e;
+  --yes: #2f6b2a;
+  --yes-bg: #dfe8cc;
+  --no: #8c1c13;
+  --no-bg: #f0d5c8;
+  --wait-bg: #e8dcc2;
+  --shadow: rgba(60, 30, 10, .18);
+  --font-title: "Cinzel Decorative", "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-body: "EB Garamond", Garamond, "Palatino Linotype", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #121816; --panel: #1b2321; --ink: #e6ece9; --muted: #95a59f; --line: #2d3a36;
-    --accent: #4fb3a2; --accent-ink: #0d1412; --gold: #d9a74a;
-    --yes: #7fd18f; --yes-bg: #1d3323; --no: #f08b80; --no-bg: #3a1f1c; --wait-bg: #232c29;
+    --bg: #14100d; --page: #1f1914; --ink: #eadcc0; --muted: #a8927a; --line: #4a3a2c;
+    --red: #d2463a; --red-ink: #1a0f0b; --gold: #e0ad55;
+    --yes: #9fcf86; --yes-bg: #24311d; --no: #f07a6c; --no-bg: #3d1d17; --wait-bg: #2a221b;
+    --shadow: rgba(0, 0, 0, .5);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #121816; --panel: #1b2321; --ink: #e6ece9; --muted: #95a59f; --line: #2d3a36;
-  --accent: #4fb3a2; --accent-ink: #0d1412; --gold: #d9a74a;
-  --yes: #7fd18f; --yes-bg: #1d3323; --no: #f08b80; --no-bg: #3a1f1c; --wait-bg: #232c29;
+  --bg: #14100d; --page: #1f1914; --ink: #eadcc0; --muted: #a8927a; --line: #4a3a2c;
+  --red: #d2463a; --red-ink: #1a0f0b; --gold: #e0ad55;
+  --yes: #9fcf86; --yes-bg: #24311d; --no: #f07a6c; --no-bg: #3d1d17; --wait-bg: #2a221b;
+  --shadow: rgba(0, 0, 0, .5);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
-  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  background:
+    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--red) 10%, transparent), transparent 50%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.45;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 28px 64px;
 }
-.wrap { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
-header { display: flex; flex-direction: column; gap: 6px; }
-h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.2rem, 7vw, 3.2rem); line-height: 1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
-h1 .d20 { color: var(--gold); }
-.sub { color: var(--muted); margin: 0; max-width: 60ch; }
-.label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.wrap { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+
+header { display: flex; align-items: center; gap: 18px; }
+header .d20 { width: 64px; height: 64px; flex: none; color: var(--red); }
+header .d20 text { fill: var(--red-ink); font-family: var(--font-display); font-weight: 800; }
+.titles { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.eyebrow { font-family: var(--font-display); font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+h1 { font-family: var(--font-title); font-weight: 700; font-size: clamp(1.9rem, 6.5vw, 3rem); line-height: 1.02; margin: 0; color: var(--red); text-wrap: balance; }
+.sub { color: var(--muted); margin: 0; max-width: 62ch; font-style: italic; }
+
+.rule { height: 4px; border: 0; margin: 0; background: linear-gradient(90deg, transparent, var(--red) 12%, var(--red) 88%, transparent); clip-path: polygon(0 50%, 12% 0, 88% 0, 100% 50%, 88% 100%, 12% 100%); }
+
+.label { font-family: var(--font-display); font-size: 13px; text-transform: uppercase; letter-spacing: .14em; color: var(--red); font-weight: 800; }
 .bar { display: flex; flex-direction: column; gap: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 button { font: inherit; cursor: pointer; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 14px; border-radius: 999px; font-weight: 500; }
-.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.chip .crown { color: var(--gold); margin-left: 4px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.chip {
+  font-family: var(--font-display); font-weight: 600; font-size: 14px; letter-spacing: .04em;
+  border: 1px solid var(--line); background: var(--page); color: var(--ink); padding: 7px 14px; border-radius: 4px;
+  box-shadow: 0 1px 0 var(--shadow);
+}
+.chip:hover { border-color: var(--red); }
+.chip[aria-pressed="true"] { background: var(--red); color: var(--red-ink); border-color: var(--red); }
+.chip .crown { color: var(--gold); margin-left: 6px; font-size: 12px; }
 .chip[aria-pressed="true"] .crown { color: inherit; }
 .add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 input[type="date"], input[type="time"], input[type="text"] {
-  font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0;
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--page); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; min-width: 0;
 }
-input[type="time"] { font-family: var(--font-mono); font-size: 14px; }
-.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; }
-.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+input[type="time"], input[type="date"] { font-family: var(--font-mono); font-size: 14px; }
+.btn { font-family: var(--font-display); font-weight: 800; letter-spacing: .06em; background: var(--red); color: var(--red-ink); border: 0; border-radius: 4px; padding: 8px 16px; box-shadow: 0 2px 0 var(--shadow); }
 .btn:disabled { opacity: .5; cursor: default; }
-.notice { padding: 12px 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); }
+.status-line { font-size: 15px; color: var(--muted); font-style: italic; min-height: 1.2em; }
+.notice { padding: 12px 16px; border: 1px dashed var(--line); border-radius: 4px; color: var(--muted); background: var(--page); font-style: italic; }
 .notice.warn { border-color: var(--gold); color: var(--ink); }
-.empty { text-align: center; padding: 36px 16px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); }
-.empty strong { display: block; font-family: var(--font-display); font-size: 1.6rem; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
+.empty { text-align: center; padding: 36px 16px; border: 2px double var(--line); border-radius: 4px; color: var(--muted); background: var(--page); font-style: italic; }
+.empty strong { display: block; font-family: var(--font-display); font-style: normal; font-size: 1.3rem; color: var(--red); margin-bottom: 6px; letter-spacing: .04em; }
 
-.list { display: flex; flex-direction: column; gap: 16px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.card.best { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
-.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
-.when { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.when .day { font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; line-height: 1; }
-.when .wk { color: var(--muted); font-weight: 500; text-transform: capitalize; }
-.tag-best { font-size: 12px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; }
+.list { display: flex; flex-direction: column; gap: 20px; }
+.card {
+  background: var(--page); border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
+  box-shadow: 0 6px 18px -8px var(--shadow);
+  border-top: 5px solid var(--gold); border-bottom: 5px solid var(--gold);
+}
+.card.best { outline: 2px solid var(--gold); outline-offset: 3px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 18px 10px; }
+.when { display: flex; flex-direction: column; gap: 2px; }
+.when .day { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; line-height: 1.05; color: var(--red); letter-spacing: .02em; }
+.when .wk { color: var(--muted); font-style: italic; text-transform: capitalize; }
+.tag-best { font-family: var(--font-display); font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: .16em; }
 .modo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.pill { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--wait-bg); color: var(--muted); }
-.pill.presencial { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.pill.online { background: transparent; color: var(--accent); border-color: var(--accent); }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-.seg button { background: transparent; border: 0; padding: 5px 12px; color: var(--muted); font-weight: 700; font-size: 13px; }
-.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
-.summary { padding: 10px 16px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; border-bottom: 1px solid var(--line); }
-.summary b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.summary .mono { font-family: var(--font-mono); color: var(--ink); }
-.rows { display: flex; flex-direction: column; }
-.row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--line); }
-.row:last-child { border-bottom: 0; }
-.row.me { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.who { font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.who .you { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.pill { font-family: var(--font-display); font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 3px; border: 1px solid var(--line); background: var(--wait-bg); color: var(--muted); letter-spacing: .04em; }
+.pill.presencial { background: var(--red); color: var(--red-ink); border-color: var(--red); }
+.pill.online { background: transparent; color: var(--red); border-color: var(--red); }
+.seg { display: inline-flex; border: 1px solid var(--red); border-radius: 3px; overflow: hidden; }
+.seg button { font-family: var(--font-display); background: transparent; border: 0; padding: 5px 12px; color: var(--red); font-weight: 600; font-size: 13px; letter-spacing: .04em; }
+.seg button + button { border-left: 1px solid var(--red); }
+.seg button[aria-pressed="true"] { background: var(--red); color: var(--red-ink); }
+.card .rule { margin: 0 18px; }
+.summary { padding: 10px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 16px; }
+.stat { display: flex; flex-direction: column; }
+.stat .k { font-family: var(--font-display); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--red); font-weight: 800; }
+.stat .v { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.stat .v.mono { font-family: var(--font-mono); font-size: 1rem; }
+.rows { display: flex; flex-direction: column; padding: 6px 0 8px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; padding: 8px 18px; }
+.row + .row { border-top: 1px dotted var(--line); }
+.row.me { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.who { font-family: var(--font-display); font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 6px; letter-spacing: .02em; }
+.who .you { font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: .14em; }
 .state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.st { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+.st { font-family: var(--font-display); font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 3px; white-space: nowrap; letter-spacing: .06em; text-transform: uppercase; }
 .st.sim { background: var(--yes-bg); color: var(--yes); }
 .st.nao { background: var(--no-bg); color: var(--no); }
 .st.pend { background: var(--wait-bg); color: var(--muted); }
-.time { font-family: var(--font-mono); font-size: 13px; }
+.time { font-family: var(--font-mono); font-size: 14px; }
 .excuse { font-style: italic; color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
 .choice { display: inline-flex; gap: 6px; }
-.choice button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+.choice button { font-family: var(--font-display); border: 1px solid var(--line); background: var(--page); color: var(--ink); padding: 5px 12px; border-radius: 3px; font-weight: 600; font-size: 13px; }
 .choice button.sim[aria-pressed="true"] { background: var(--yes-bg); color: var(--yes); border-color: var(--yes); }
 .choice button.nao[aria-pressed="true"] { background: var(--no-bg); color: var(--no); border-color: var(--no); }
-.inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.inline input[type="text"] { width: min(320px, 100%); }
-.dice { border: 1px solid var(--line); background: transparent; color: var(--gold); border-radius: 6px; padding: 5px 9px; font-size: 13px; font-weight: 700; }
-.card-foot { display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--line); }
-.link { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; padding: 4px; }
+.inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; font-style: italic; color: var(--muted); }
+.inline input[type="text"] { width: min(320px, 100%); font-style: normal; }
+.dice { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 3px; padding: 4px 10px; font-size: 12px; font-weight: 800; letter-spacing: .04em; font-style: normal; }
+.dice svg { width: 15px; height: 15px; }
+.card-foot { display: flex; justify-content: flex-end; padding: 2px 18px 10px; }
+.link { background: none; border: 0; color: var(--muted); font-size: 15px; font-style: italic; text-decoration: underline; padding: 4px; }
 .link.danger { color: var(--no); }
 details { color: var(--muted); }
-details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+details summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; letter-spacing: .06em; padding: 6px 0; }
 details .list { margin-top: 10px; opacity: .8; }
-.status-line { font-size: 13px; color: var(--muted); min-height: 1.2em; }
 @media (max-width: 560px) {
+  header .d20 { width: 48px; height: 48px; }
   .row { grid-template-columns: 1fr; gap: 6px; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .card { transition: border-color .2s; }
+  .dice:hover svg { animation: roll .5s ease-out; }
+  @keyframes roll { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>Calendário da Mesa <span class="d20" aria-hidden="true">⬢</span></h1>
-    <p class="sub">Escolha seu nome, diga se pode em cada data e a partir de que horas. Se não puder, a desculpa é obrigatória (e quanto mais esfarrapada, melhor). O mestre decide se a sessão é presencial ou on-line.</p>
+    <svg class="d20" viewBox="0 0 100 100" aria-hidden="true">
+      <polygon points="50,3 92,27 92,73 50,97 8,73 8,27" fill="currentColor"/>
+      <polygon points="50,22 76,66 24,66" fill="none" stroke="var(--red-ink)" stroke-width="2.5" stroke-linejoin="round" opacity=".55"/>
+      <path d="M50 3 L50 22 M92 27 L76 66 M8 27 L24 66 M50 97 L76 66 M50 97 L24 66 M92 73 L76 66 M8 73 L24 66 M8 27 L50 22 L92 27" stroke="var(--red-ink)" stroke-width="2" fill="none" opacity=".35"/>
+      <text x="50" y="57" text-anchor="middle" font-size="22">20</text>
+    </svg>
+    <div class="titles">
+      <span class="eyebrow">Convocação da guilda</span>
+      <h1>Calendário da Mesa</h1>
+      <p class="sub">Aventureiro, escolha seu nome, diga se comparece em cada data e a partir de que hora. Se não puder vir, declare sua desculpa (o mestre julgará). O mestre decide se a sessão é na taverna ou pelo portal on-line.</p>
+    </div>
   </header>
 
+  <hr class="rule">
+
   <section class="bar" aria-label="Quem é você">
-    <span class="label" id="lbl-who">Quem é você?</span>
+    <span class="label" id="lbl-who">Escolha seu aventureiro</span>
     <div class="chips" id="people" role="group" aria-labelledby="lbl-who"></div>
   </section>
 
-  <section class="bar" id="add-sec" aria-label="Adicionar data">
-    <span class="label">Propor uma data</span>
+  <section class="bar" id="add-sec" aria-label="Propor data">
+    <span class="label">Propor uma sessão</span>
     <form class="add" id="add-form">
       <input type="date" id="new-date" required aria-label="Data da sessão">
-      <button class="btn" type="submit" id="add-btn">Adicionar data</button>
+      <button class="btn" type="submit" id="add-btn">Convocar a mesa</button>
       <span class="status-line" id="add-status"></span>
     </form>
   </section>
 
   <div id="notice"></div>
   <div class="list" id="list">
-    <div class="empty"><strong>Carregando o quadro…</strong>As datas propostas aparecem aqui.</div>
+    <div class="empty"><strong>Consultando os pergaminhos…</strong>As sessões propostas aparecem aqui.</div>
   </div>
   <details id="past" hidden>
-    <summary>Sessões que já passaram</summary>
+    <summary>Crônicas passadas</summary>
     <div class="list" id="past-list"></div>
   </details>
 </div>
@@ -158,36 +200,39 @@ const PEOPLE = ["Henrique", "Luis", "Carlos", "Lira", "Augusto", "Jean", "Vitor"
 const MASTER = "Henrique";
 const EXCUSES = [
   "Meu gato sentou no teclado e eu não tenho coragem de tirar.",
-  "Vou ajudar minha tia a montar um guarda-roupa da Tok&Stok.",
+  "Vou ajudar minha tia a montar um guarda-roupa sem manual.",
   "Tenho que regar uma planta que nem é minha.",
-  "Prometi pra mim mesmo que ia dormir cedo (não vou).",
+  "Fui amaldiçoado por um mímico disfarçado de sofá.",
   "Minha internet só funciona quando não tem RPG.",
   "Esqueci que tinha um aniversário de alguém que eu nem gosto.",
-  "Vou ficar esperando um entregador que diz 'chegando' há 3 dias.",
-  "Meu personagem precisa de um tempo pra pensar na vida.",
+  "Estou esperando um entregador que diz 'chegando' há 3 dias.",
+  "Meu personagem precisa de um descanso longo. Eu também.",
   "Fui convocado para um conselho de anões. É sério.",
-  "Estou em recuperação emocional desde o último crítico 1.",
-  "Vou lavar o tênis branco e não posso tirar o olho dele.",
-  "O horóscopo disse que hoje não é dia de rolar dados."
+  "Ainda em recuperação emocional desde o último 1 natural.",
+  "Um bardo me deve dinheiro e vou cobrar pessoalmente.",
+  "O horóscopo disse que hoje não é dia de rolar dados.",
+  "Falhei no teste de Constituição contra a preguiça."
 ];
+const DIE = '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,4 92,28 92,72 50,96 8,72 8,28" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><polygon points="50,26 74,66 26,66" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/></svg>';
 const $ = (s) => document.querySelector(s);
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
 
 let me = store("mesa-me") || null;
 if (!PEOPLE.includes(me)) me = null;
 let db = null, canWrite = true;
-let sessions = new Map();   // date -> {data, modo}
-let answers = new Map();    // `${date}__${pessoa}` -> {status, horario, desculpa}
+let sessions = new Map();
+let answers = new Map();
 let loaded = { s: false, r: false };
 let confirmDel = null;
 const writeChain = new Map();
+const READONLY_MSG = "Você só pode ler este pergaminho. Peça ao Carlos acesso de Colaborador para marcar presença.";
 
 function write(path, body, op = "set") {
   const prev = writeChain.get(path) || Promise.resolve();
   const next = prev.catch(() => {}).then(() => op === "delete" ? db.doc(path).delete() : db.doc(path)[op](body));
   writeChain.set(path, next);
   next.catch((e) => {
-    if (e && e.code === "invalid_argument") { canWrite = false; showNotice("Você só pode ver este quadro. Peça ao Carlos acesso de Colaborador para marcar presença.", true); render(); }
+    if (e && e.code === "invalid_argument") { canWrite = false; showNotice(READONLY_MSG, true); render(); }
     else showNotice("Não deu para salvar agora. Tente de novo em instantes.", true);
   });
   return next;
@@ -206,7 +251,7 @@ function fmtDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   return {
-    day: dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", ""),
+    day: dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" }),
     wk: dt.toLocaleDateString("pt-BR", { weekday: "long" }) + (y !== new Date().getFullYear() ? " · " + y : "")
   };
 }
@@ -218,13 +263,14 @@ function renderPeople() {
     b.className = "chip"; b.type = "button"; b.id = "who-" + p;
     b.setAttribute("aria-pressed", String(p === me));
     b.textContent = p;
-    if (p === MASTER) { const c = document.createElement("span"); c.className = "crown"; c.textContent = "♛ mestre"; b.append(c); }
+    if (p === MASTER) { const c = document.createElement("span"); c.className = "crown"; c.textContent = "♛ Mestre"; b.append(c); }
     b.onclick = () => { me = p; store("mesa-me", p); renderPeople(); render(); };
     box.append(b);
   });
 }
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function stat(k, v, mono) { const s = el("div", "stat"); s.append(el("span", "k", k), el("span", "v" + (mono ? " mono" : ""), v)); return s; }
 
 function summary(date) {
   let yes = [], no = 0;
@@ -237,15 +283,15 @@ function summary(date) {
   return { yes: yes.length, no, pend: PEOPLE.length - yes.length - no, start: times.length ? times[times.length - 1] : "" };
 }
 
-function modoLabel(m) { return m === "presencial" ? "Presencial" : m === "online" ? "On-line" : "Formato a definir"; }
+function modoLabel(m) { return m === "presencial" ? "Presencial · na taverna" : m === "online" ? "On-line · pelo portal" : "Formato a definir"; }
 
 function card(date, s, isBest) {
   const f = fmtDate(date), sum = summary(date);
   const c = el("article", "card" + (isBest ? " best" : ""));
   const head = el("div", "card-head");
   const when = el("div", "when");
+  if (isBest) when.append(el("span", "tag-best", "✦ Melhor data até agora"));
   when.append(el("span", "day", f.day), el("span", "wk", f.wk));
-  if (isBest) when.append(el("span", "tag-best", "Melhor data até agora"));
   const modo = el("div", "modo");
   if (me === MASTER && canWrite) {
     const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Formato da sessão");
@@ -260,15 +306,12 @@ function card(date, s, isBest) {
     modo.append(el("span", "pill " + (s.modo || ""), modoLabel(s.modo)));
   }
   head.append(when, modo);
-  c.append(head);
+  c.append(head, el("hr", "rule"));
 
   const sm = el("div", "summary");
-  const a = el("span"); a.innerHTML = `<b>${sum.yes}</b> podem`;
-  const b = el("span"); b.innerHTML = `<b>${sum.no}</b> não podem`;
-  const d = el("span"); d.innerHTML = `<b>${sum.pend}</b> sem resposta`;
-  sm.append(a, b, d);
-  if (sum.start) { const t = el("span"); t.innerHTML = `todos juntos a partir de <span class="mono">${sum.start}</span>`; sm.append(t); }
-  c.append(sm);
+  sm.append(stat("Presentes", `${sum.yes} / ${PEOPLE.length}`), stat("Ausentes", String(sum.no)), stat("Sem resposta", String(sum.pend)));
+  if (sum.start) sm.append(stat("Mesa completa às", sum.start, true));
+  c.append(sm, el("hr", "rule"));
 
   const rows = el("div", "rows");
   PEOPLE.forEach((p) => rows.append(row(date, p)));
@@ -294,6 +337,7 @@ function row(date, p) {
   const isMe = p === me && canWrite;
   const r = el("div", "row" + (p === me ? " me" : ""));
   const who = el("div", "who", p);
+  if (p === MASTER) who.title = "Mestre";
   if (p === me) who.append(el("span", "you", "você"));
   r.append(who);
   const st = el("div", "state");
@@ -323,40 +367,40 @@ function row(date, p) {
       const t = el("input"); t.type = "text"; t.id = "x-" + key; t.placeholder = "Sua desculpa esfarrapada"; t.maxLength = 160;
       t.value = a.desculpa || ""; t.setAttribute("aria-label", "Desculpa");
       t.onchange = () => save({ desculpa: t.value.trim() });
-      const dice = el("button", "dice", "Rolar desculpa"); dice.type = "button"; dice.id = "dice-" + key;
+      const dice = el("button", "dice"); dice.type = "button"; dice.id = "dice-" + key;
+      dice.innerHTML = DIE + "Rolar desculpa";
       dice.onclick = () => { const e = EXCUSES[Math.floor(Math.random() * EXCUSES.length)]; save({ desculpa: e }); render(); };
       w.append(t, dice); st.append(w);
     }
   } else {
     if (a.status === "sim") {
-      st.append(el("span", "st sim", "Pode"));
+      st.append(el("span", "st sim", "Presente"));
       st.append(el("span", "time", a.horario ? "a partir de " + a.horario : "horário livre"));
     } else if (a.status === "nao") {
-      st.append(el("span", "st nao", "Não pode"));
-      st.append(el("span", "excuse", a.desculpa ? "“" + a.desculpa + "”" : "nem deu desculpa…"));
-    } else st.append(el("span", "st pend", "Ainda não respondeu"));
+      st.append(el("span", "st nao", "Ausente"));
+      st.append(el("span", "excuse", a.desculpa ? "“" + a.desculpa + "”" : "fugiu sem dar desculpa…"));
+    } else st.append(el("span", "st pend", "Não rolou iniciativa"));
   }
   r.append(st);
   return r;
 }
 
 function render() {
-  // keep focus and in-progress typing across live updates
   const act = document.activeElement, actId = act && act.id, typing = act && act.tagName === "INPUT" && act.type === "text" ? { v: act.value, s: act.selectionStart } : null;
   $("#add-sec").hidden = !canWrite || !db;
   const list = $("#list"), past = $("#past-list");
   if (!db) return;
   if (!loaded.s || !loaded.r) return;
   list.innerHTML = ""; past.innerHTML = "";
-  if (!me) { const n = el("div", "notice", "Escolha seu nome acima para marcar sua presença."); list.append(n); }
+  if (!me) list.append(el("div", "notice", "Escolha seu aventureiro acima para marcar presença."));
   const today = todayISO();
   const all = [...sessions.values()].sort((x, y) => x.data.localeCompare(y.data));
   const up = all.filter((s) => s.data >= today), old = all.filter((s) => s.data < today).reverse();
   let best = null, bestScore = -1;
   up.forEach((s) => { const sm = summary(s.data); if (sm.yes > bestScore && sm.yes >= 2) { bestScore = sm.yes; best = s.data; } });
   if (!up.length) {
-    const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma data proposta</strong>";
-    e.append(canWrite ? "Use “Propor uma data” acima para abrir a primeira sessão." : "Assim que alguém propor uma data, ela aparece aqui.");
+    const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma sessão convocada</strong>";
+    e.append(canWrite ? "Use “Propor uma sessão” acima para abrir a próxima aventura." : "Assim que alguém convocar a mesa, a data aparece aqui.");
     list.append(e);
   }
   up.forEach((s) => list.append(card(s.data, s, s.data === best)));
@@ -374,7 +418,7 @@ $("#add-form").addEventListener("submit", async (ev) => {
   if (!v) return;
   if (sessions.has(v)) { $("#add-status").textContent = "Essa data já está no quadro."; return; }
   $("#add-btn").disabled = true;
-  try { await write("sessoes/" + v, { data: v, modo: "" }); $("#add-status").textContent = "Data adicionada."; $("#new-date").value = ""; }
+  try { await write("sessoes/" + v, { data: v, modo: "" }); $("#add-status").textContent = "A mesa foi convocada."; $("#new-date").value = ""; }
   catch (e) {}
   $("#add-btn").disabled = false;
 });
@@ -383,7 +427,7 @@ renderPeople();
 $("#new-date").min = todayISO();
 
 (async () => {
-  const timer = setTimeout(() => { if (!loaded.s || !loaded.r) showNotice("O quadro ainda não respondeu. Confira sua conexão; ele carrega sozinho quando voltar.", true); }, 10000);
+  const timer = setTimeout(() => { if (!loaded.s || !loaded.r) showNotice("Os pergaminhos ainda não chegaram. Confira sua conexão; o quadro carrega sozinho quando voltar.", true); }, 10000);
   db = await (window.claude?.use ? window.claude.use("db") : null);
   if (!db) {
     clearTimeout(timer);
@@ -396,7 +440,7 @@ $("#new-date").min = todayISO();
     const cw = user ? await user.can("data.write") : null;
     if (cw === false) canWrite = false;
   } catch (e) {}
-  const done = () => { if (loaded.s && loaded.r) { clearTimeout(timer); showNotice(canWrite ? "" : "Você só pode ver este quadro. Peça ao Carlos acesso de Colaborador para marcar presença.", !canWrite); render(); } };
+  const done = () => { if (loaded.s && loaded.r) { clearTimeout(timer); showNotice(canWrite ? "" : READONLY_MSG, !canWrite); render(); } };
   db.collection("sessoes").onSnapshot((snap) => {
     sessions = new Map(snap.docs.map((d) => [d.id, { data: d.id, modo: "", ...d.data() }]));
     if (!snap.metadata.fromCache) loaded.s = true; else loaded.s = loaded.s || snap.size > 0;
