@@ -224,6 +224,20 @@ h2 { text-wrap: balance; }
 .iam { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 15px; }
 .iam b { font-family: var(--font-display); }
 .iam .link { font-size: 14px; }
+.next-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.btn.light { background: var(--red-ink); color: var(--red); box-shadow: none; font-size: 13px; padding: 6px 12px; }
+.next.none .btn.light { background: var(--red); color: var(--red-ink); }
+.info { display: flex; flex-direction: column; gap: 2px; padding: 0 14px 6px; font-size: 14px; min-width: 0; }
+.info-l { overflow-wrap: anywhere; }
+.info b, .fld .k { font-family: var(--font-display); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--red); font-weight: 800; margin-right: 6px; }
+.info a { color: inherit; }
+.next .info { padding: 2px 0 0; }
+.next .info b { color: var(--red-ink); opacity: .8; }
+.next.none .info b { color: var(--red); }
+.master-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; padding: 8px 14px; }
+.fld { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fld input { width: 100%; font-size: 15px; }
+.copy-fallback { width: 100%; min-height: 180px; font: 14px/1.4 var(--font-mono); color: var(--ink); background: var(--page); border: 1px solid var(--gold); border-radius: 4px; padding: 8px; }
 @media (max-width: 560px) {
   .bigs { gap: 6px; }
   .big { padding: 6px 8px; }
@@ -263,6 +277,7 @@ h2 { text-wrap: balance; }
 
   <div id="notice"></div>
   <section class="next" id="next" hidden aria-label="Próxima sessão confirmada"></section>
+  <textarea id="copy-fallback" class="copy-fallback" hidden readonly aria-label="Resumo para copiar"></textarea>
   <section class="bigs" id="bigs" hidden aria-label="Resumo das sessões"></section>
   <div class="toolbar" id="toolbar" hidden></div>
   <div class="list" id="list">
@@ -300,6 +315,7 @@ function avatar(p, cls) {
 const MASTER = "Henrique";
 const DEFAULT_TIME = "20:00";
 const MAX_AUSENCIAS = 2;
+const PAGE_URL = "https://claude.ai/artifact/MTjz4iAsSPDUTEWCy3UFF6";
 const PTS = { aus: 1, sum: 2, furo: 3 };
 const FILTER_LABEL = { todas: "Mostrando todas as próximas datas", ok: "Mostrando só as que vão rolar", open: "Mostrando só as datas em aberto", off: "Mostrando só as que não vão rolar", me: "Mostrando só as datas que você ainda não respondeu" };
 const EXCUSES = [
@@ -486,6 +502,7 @@ function card(date, s) {
   } else modo.append(el("span", "pill " + (s.modo || ""), modoLabel(s.modo)));
   head.append(when, modo);
   c.append(head);
+  const ib = infoBlock(s); if (ib) c.append(ib);
   const open = openCards.has(date);
   const strip = el("div", "strip");
   const faces = el("div", "faces");
@@ -519,6 +536,20 @@ function card(date, s) {
   c.append(strip);
   if (!open) return c;
   c.append(el("hr", "rule"));
+  if (isMaster && !past && !arch) {
+    const ed = el("div", "master-edit");
+    const mk = (id, label, val, ph, field) => {
+      const w = el("label", "fld"); w.append(el("span", "k", label));
+      const i = el("input"); i.type = "text"; i.id = id; i.value = val || ""; i.placeholder = ph; i.maxLength = 200;
+      i.onchange = () => saveSession(date, { [field]: i.value.trim() });
+      w.append(i); return w;
+    };
+    ed.append(
+      mk("loc-" + date, "Local", s.local, s.modo === "online" ? "Canal do Discord ou link" : "Endereço ou casa de quem", "local"),
+      mk("rec-" + date, "Recado do mestre", s.recado, "Ex.: subam de nível antes da sessão", "recado")
+    );
+    c.append(ed, el("hr", "rule"));
+  }
 
   const sm = el("div", "summary");
   sm.append(stat("Confirmados", `${sum.yes} / ${PEOPLE.length}`), stat("Ausentes", String(sum.no)), stat("Sem resposta", String(sum.pend)));
@@ -632,6 +663,62 @@ function big(key, label, n, hint, disabled) {
   b.onclick = () => setFilter(filter === key ? "todas" : key);
   return b;
 }
+function shortDay(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wk = new Date(y, m - 1, d).toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+  return wk.charAt(0).toUpperCase() + wk.slice(1) + " " + String(d).padStart(2, "0") + "/" + String(m).padStart(2, "0");
+}
+function buildSummary(qs) {
+  const L = [];
+  const ok = qs.find((o) => o.q === "ok");
+  if (ok) {
+    const s = ok.s;
+    L.push("🎲 *Próxima sessão confirmada*");
+    L.push(`${shortDay(s.data)} · a partir de ${ok.sum.start || DEFAULT_TIME} · ${modoLabel(s.modo)}`);
+    if (s.local) L.push("📍 " + s.local);
+    if (s.recado) L.push("📜 Recado do mestre: " + s.recado);
+    const yes = PEOPLE.filter((p) => (answers.get(s.data + "__" + p) || {}).status === "sim");
+    const out = PEOPLE.filter((p) => !yes.includes(p));
+    L.push(`✅ Confirmados (${yes.length}): ${yes.join(", ")}`);
+    if (out.length) L.push(`❌ Fora: ${out.join(", ")}`);
+  } else L.push("🎲 *Nenhuma sessão confirmada ainda*");
+  const open = qs.filter((o) => o.q === "open").slice(0, 4);
+  if (open.length) {
+    L.push("", "⏳ *Em aberto*");
+    open.forEach((o) => { const need = PEOPLE.length - MAX_AUSENCIAS - o.sum.yes; L.push(`• ${shortDay(o.s.data)}: ${o.sum.yes}/${PEOPLE.length}, falta${need > 1 ? "m" : ""} ${need}`); });
+  }
+  const pend = {};
+  qs.forEach((o) => { if (o.q === "off") return; PEOPLE.forEach((p) => { if (!(answers.get(o.s.data + "__" + p) || {}).status) pend[p] = (pend[p] || 0) + 1; }); });
+  const pl = Object.entries(pend).sort((a, b) => b[1] - a[1]);
+  if (pl.length) L.push("", "🫵 *Falta responder:* " + pl.map(([p, n]) => `${p} (${n})`).join(", "));
+  L.push("", "Marca aí: " + PAGE_URL);
+  return L.join("\n");
+}
+function copyButton(qs) {
+  const row = el("div", "next-actions");
+  const b = el("button", "btn light", "Copiar resumo pro zap"); b.type = "button"; b.id = "copy-zap";
+  b.onclick = () => {
+    const t = buildSummary(qs), ta = $("#copy-fallback");
+    const fallback = () => { ta.hidden = false; ta.value = t; ta.focus(); ta.select(); b.textContent = "Texto selecionado, é só copiar"; };
+    try {
+      navigator.clipboard.writeText(t).then(() => { ta.hidden = true; b.textContent = "Copiado! Cola no grupo"; setTimeout(() => { b.textContent = "Copiar resumo pro zap"; }, 2500); }, fallback);
+    } catch (e) { fallback(); }
+  };
+  row.append(b);
+  return row;
+}
+function infoBlock(s) {
+  if (!s.local && !s.recado) return null;
+  const d = el("div", "info");
+  if (s.local) {
+    const l = el("span", "info-l"); l.append(el("b", "", "Local"));
+    if (/^https?:\/\//i.test(s.local)) { const a = el("a", "", s.local); a.href = s.local; a.target = "_blank"; a.rel = "noopener"; l.append(a); }
+    else l.append(s.local);
+    d.append(l);
+  }
+  if (s.recado) { const r = el("span", "info-l"); r.append(el("b", "", "Recado"), s.recado); d.append(r); }
+  return d;
+}
 function renderNext(qs) {
   const box = $("#next"); box.hidden = false; box.innerHTML = "";
   const ok = qs.find((o) => o.q === "ok");
@@ -641,6 +728,7 @@ function renderNext(qs) {
     const open = qs.filter((o) => o.q === "open").sort((a, b) => b.sum.yes - a.sum.yes || a.s.data.localeCompare(b.s.data))[0];
     box.append(label, el("span", "next-day", "Nenhuma ainda"));
     if (open) { const f = fmtDate(open.s.data), need = PEOPLE.length - MAX_AUSENCIAS - open.sum.yes; box.append(el("span", "next-meta", `Mais perto de fechar: ${f.day} (${f.wk.split(" ")[0]}), falta${need > 1 ? "m" : ""} ${plural(need, "presença", "presenças")}.`)); }
+    box.append(copyButton(qs));
     return;
   }
   box.classList.remove("none");
@@ -657,6 +745,8 @@ function renderNext(qs) {
   box.append(top);
   const out = PEOPLE.filter((p) => (answers.get(ok.s.data + "__" + p) || {}).status !== "sim");
   box.append(el("span", "next-meta", `${plural(ok.sum.yes, "confirmado", "confirmados")}` + (out.length ? ` · fora: ${out.join(", ")}` : " · mesa completa")));
+  const ib = infoBlock(ok.s); if (ib) box.append(ib);
+  box.append(copyButton(qs));
 }
 function renderBigs(qs) {
   const box = $("#bigs"); box.hidden = false; box.innerHTML = "";
