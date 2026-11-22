@@ -1,0 +1,411 @@
+<title>Calendário da Mesa</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@500;700&family=Karla:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: um quadro de avisos da taverna — seletor de jogador no topo, uma ficha por data de sessão, cada ficha com a linha de todos os 7 jogadores. */
+:root {
+  --bg: #eef1ee;
+  --panel: #ffffff;
+  --ink: #1b2422;
+  --muted: #5c6b67;
+  --line: #d3dbd8;
+  --accent: #1f6f63;
+  --accent-ink: #ffffff;
+  --gold: #a9741c;
+  --yes: #2d7a3e;
+  --yes-bg: #e2f1e5;
+  --no: #b0372c;
+  --no-bg: #f8e4e1;
+  --wait-bg: #eceeec;
+  --font-display: "Grenze Gotisch", "Palatino Linotype", Georgia, serif;
+  --font-body: "Karla", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121816; --panel: #1b2321; --ink: #e6ece9; --muted: #95a59f; --line: #2d3a36;
+    --accent: #4fb3a2; --accent-ink: #0d1412; --gold: #d9a74a;
+    --yes: #7fd18f; --yes-bg: #1d3323; --no: #f08b80; --no-bg: #3a1f1c; --wait-bg: #232c29;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121816; --panel: #1b2321; --ink: #e6ece9; --muted: #95a59f; --line: #2d3a36;
+  --accent: #4fb3a2; --accent-ink: #0d1412; --gold: #d9a74a;
+  --yes: #7fd18f; --yes-bg: #1d3323; --no: #f08b80; --no-bg: #3a1f1c; --wait-bg: #232c29;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+.wrap { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.2rem, 7vw, 3.2rem); line-height: 1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+h1 .d20 { color: var(--gold); }
+.sub { color: var(--muted); margin: 0; max-width: 60ch; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.bar { display: flex; flex-direction: column; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 14px; border-radius: 999px; font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip .crown { color: var(--gold); margin-left: 4px; }
+.chip[aria-pressed="true"] .crown { color: inherit; }
+.add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+input[type="date"], input[type="time"], input[type="text"] {
+  font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0;
+}
+input[type="time"] { font-family: var(--font-mono); font-size: 14px; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+.btn:disabled { opacity: .5; cursor: default; }
+.notice { padding: 12px 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); }
+.notice.warn { border-color: var(--gold); color: var(--ink); }
+.empty { text-align: center; padding: 36px 16px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); }
+.empty strong { display: block; font-family: var(--font-display); font-size: 1.6rem; color: var(--ink); font-weight: 500; margin-bottom: 4px; }
+
+.list { display: flex; flex-direction: column; gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.card.best { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.when { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.when .day { font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; line-height: 1; }
+.when .wk { color: var(--muted); font-weight: 500; text-transform: capitalize; }
+.tag-best { font-size: 12px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; }
+.modo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pill { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--wait-bg); color: var(--muted); }
+.pill.presencial { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.pill.online { background: transparent; color: var(--accent); border-color: var(--accent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 5px 12px; color: var(--muted); font-weight: 700; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.summary { padding: 10px 16px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; border-bottom: 1px solid var(--line); }
+.summary b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.summary .mono { font-family: var(--font-mono); color: var(--ink); }
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row.me { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.who { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.who .you { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.st { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+.st.sim { background: var(--yes-bg); color: var(--yes); }
+.st.nao { background: var(--no-bg); color: var(--no); }
+.st.pend { background: var(--wait-bg); color: var(--muted); }
+.time { font-family: var(--font-mono); font-size: 13px; }
+.excuse { font-style: italic; color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+.choice { display: inline-flex; gap: 6px; }
+.choice button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+.choice button.sim[aria-pressed="true"] { background: var(--yes-bg); color: var(--yes); border-color: var(--yes); }
+.choice button.nao[aria-pressed="true"] { background: var(--no-bg); color: var(--no); border-color: var(--no); }
+.inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.inline input[type="text"] { width: min(320px, 100%); }
+.dice { border: 1px solid var(--line); background: transparent; color: var(--gold); border-radius: 6px; padding: 5px 9px; font-size: 13px; font-weight: 700; }
+.card-foot { display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--line); }
+.link { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; padding: 4px; }
+.link.danger { color: var(--no); }
+details { color: var(--muted); }
+details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+details .list { margin-top: 10px; opacity: .8; }
+.status-line { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card { transition: border-color .2s; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Calendário da Mesa <span class="d20" aria-hidden="true">⬢</span></h1>
+    <p class="sub">Escolha seu nome, diga se pode em cada data e a partir de que horas. Se não puder, a desculpa é obrigatória (e quanto mais esfarrapada, melhor). O mestre decide se a sessão é presencial ou on-line.</p>
+  </header>
+
+  <section class="bar" aria-label="Quem é você">
+    <span class="label" id="lbl-who">Quem é você?</span>
+    <div class="chips" id="people" role="group" aria-labelledby="lbl-who"></div>
+  </section>
+
+  <section class="bar" id="add-sec" aria-label="Adicionar data">
+    <span class="label">Propor uma data</span>
+    <form class="add" id="add-form">
+      <input type="date" id="new-date" required aria-label="Data da sessão">
+      <button class="btn" type="submit" id="add-btn">Adicionar data</button>
+      <span class="status-line" id="add-status"></span>
+    </form>
+  </section>
+
+  <div id="notice"></div>
+  <div class="list" id="list">
+    <div class="empty"><strong>Carregando o quadro…</strong>As datas propostas aparecem aqui.</div>
+  </div>
+  <details id="past" hidden>
+    <summary>Sessões que já passaram</summary>
+    <div class="list" id="past-list"></div>
+  </details>
+</div>
+
+<script>
+const PEOPLE = ["Henrique", "Luis", "Carlos", "Lira", "Augusto", "Jean", "Vitor"];
+const MASTER = "Henrique";
+const EXCUSES = [
+  "Meu gato sentou no teclado e eu não tenho coragem de tirar.",
+  "Vou ajudar minha tia a montar um guarda-roupa da Tok&Stok.",
+  "Tenho que regar uma planta que nem é minha.",
+  "Prometi pra mim mesmo que ia dormir cedo (não vou).",
+  "Minha internet só funciona quando não tem RPG.",
+  "Esqueci que tinha um aniversário de alguém que eu nem gosto.",
+  "Vou ficar esperando um entregador que diz 'chegando' há 3 dias.",
+  "Meu personagem precisa de um tempo pra pensar na vida.",
+  "Fui convocado para um conselho de anões. É sério.",
+  "Estou em recuperação emocional desde o último crítico 1.",
+  "Vou lavar o tênis branco e não posso tirar o olho dele.",
+  "O horóscopo disse que hoje não é dia de rolar dados."
+];
+const $ = (s) => document.querySelector(s);
+const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+
+let me = store("mesa-me") || null;
+if (!PEOPLE.includes(me)) me = null;
+let db = null, canWrite = true;
+let sessions = new Map();   // date -> {data, modo}
+let answers = new Map();    // `${date}__${pessoa}` -> {status, horario, desculpa}
+let loaded = { s: false, r: false };
+let confirmDel = null;
+const writeChain = new Map();
+
+function write(path, body, op = "set") {
+  const prev = writeChain.get(path) || Promise.resolve();
+  const next = prev.catch(() => {}).then(() => op === "delete" ? db.doc(path).delete() : db.doc(path)[op](body));
+  writeChain.set(path, next);
+  next.catch((e) => {
+    if (e && e.code === "invalid_argument") { canWrite = false; showNotice("Você só pode ver este quadro. Peça ao Carlos acesso de Colaborador para marcar presença.", true); render(); }
+    else showNotice("Não deu para salvar agora. Tente de novo em instantes.", true);
+  });
+  return next;
+}
+
+function showNotice(msg, warn) {
+  $("#notice").innerHTML = msg ? `<div class="notice${warn ? " warn" : ""}"></div>` : "";
+  if (msg) $("#notice .notice").textContent = msg;
+}
+
+function todayISO() {
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+function fmtDate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return {
+    day: dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", ""),
+    wk: dt.toLocaleDateString("pt-BR", { weekday: "long" }) + (y !== new Date().getFullYear() ? " · " + y : "")
+  };
+}
+
+function renderPeople() {
+  const box = $("#people"); box.innerHTML = "";
+  PEOPLE.forEach((p) => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.id = "who-" + p;
+    b.setAttribute("aria-pressed", String(p === me));
+    b.textContent = p;
+    if (p === MASTER) { const c = document.createElement("span"); c.className = "crown"; c.textContent = "♛ mestre"; b.append(c); }
+    b.onclick = () => { me = p; store("mesa-me", p); renderPeople(); render(); };
+    box.append(b);
+  });
+}
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function summary(date) {
+  let yes = [], no = 0;
+  PEOPLE.forEach((p) => {
+    const a = answers.get(date + "__" + p);
+    if (a && a.status === "sim") yes.push(a.horario || "");
+    else if (a && a.status === "nao") no++;
+  });
+  const times = yes.filter(Boolean).sort();
+  return { yes: yes.length, no, pend: PEOPLE.length - yes.length - no, start: times.length ? times[times.length - 1] : "" };
+}
+
+function modoLabel(m) { return m === "presencial" ? "Presencial" : m === "online" ? "On-line" : "Formato a definir"; }
+
+function card(date, s, isBest) {
+  const f = fmtDate(date), sum = summary(date);
+  const c = el("article", "card" + (isBest ? " best" : ""));
+  const head = el("div", "card-head");
+  const when = el("div", "when");
+  when.append(el("span", "day", f.day), el("span", "wk", f.wk));
+  if (isBest) when.append(el("span", "tag-best", "Melhor data até agora"));
+  const modo = el("div", "modo");
+  if (me === MASTER && canWrite) {
+    const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Formato da sessão");
+    [["presencial", "Presencial"], ["online", "On-line"]].forEach(([v, l]) => {
+      const b = el("button", "", l); b.type = "button"; b.id = `modo-${date}-${v}`;
+      b.setAttribute("aria-pressed", String(s.modo === v));
+      b.onclick = () => write("sessoes/" + date, { data: date, modo: s.modo === v ? "" : v });
+      seg.append(b);
+    });
+    modo.append(seg);
+  } else {
+    modo.append(el("span", "pill " + (s.modo || ""), modoLabel(s.modo)));
+  }
+  head.append(when, modo);
+  c.append(head);
+
+  const sm = el("div", "summary");
+  const a = el("span"); a.innerHTML = `<b>${sum.yes}</b> podem`;
+  const b = el("span"); b.innerHTML = `<b>${sum.no}</b> não podem`;
+  const d = el("span"); d.innerHTML = `<b>${sum.pend}</b> sem resposta`;
+  sm.append(a, b, d);
+  if (sum.start) { const t = el("span"); t.innerHTML = `todos juntos a partir de <span class="mono">${sum.start}</span>`; sm.append(t); }
+  c.append(sm);
+
+  const rows = el("div", "rows");
+  PEOPLE.forEach((p) => rows.append(row(date, p)));
+  c.append(rows);
+
+  if (me === MASTER && canWrite) {
+    const foot = el("div", "card-foot");
+    const del = el("button", "link danger", confirmDel === date ? "Confirmar: apagar esta data e as respostas" : "Remover data");
+    del.type = "button"; del.id = "del-" + date;
+    del.onclick = () => {
+      if (confirmDel !== date) { confirmDel = date; render(); return; }
+      confirmDel = null;
+      write("sessoes/" + date, null, "delete");
+      PEOPLE.forEach((p) => { if (answers.has(date + "__" + p)) write("respostas/" + date + "__" + p, null, "delete"); });
+    };
+    foot.append(del); c.append(foot);
+  }
+  return c;
+}
+
+function row(date, p) {
+  const key = date + "__" + p, a = answers.get(key) || {};
+  const isMe = p === me && canWrite;
+  const r = el("div", "row" + (p === me ? " me" : ""));
+  const who = el("div", "who", p);
+  if (p === me) who.append(el("span", "you", "você"));
+  r.append(who);
+  const st = el("div", "state");
+  const path = "respostas/" + key;
+  const save = (patch) => {
+    const cur = answers.get(key) || {};
+    const body = { data: date, pessoa: p, status: cur.status || "", horario: cur.horario || "", desculpa: cur.desculpa || "", ...patch, atualizado: new Date().toISOString() };
+    answers.set(key, body);
+    return write(path, body);
+  };
+  if (isMe) {
+    const ch = el("div", "choice"); ch.setAttribute("role", "group"); ch.setAttribute("aria-label", "Você pode?");
+    [["sim", "Posso"], ["nao", "Não posso"]].forEach(([v, l]) => {
+      const b = el("button", v, l); b.type = "button"; b.id = `st-${key}-${v}`;
+      b.setAttribute("aria-pressed", String(a.status === v));
+      b.onclick = () => { save({ status: a.status === v ? "" : v }); render(); };
+      ch.append(b);
+    });
+    st.append(ch);
+    if (a.status === "sim") {
+      const w = el("label", "inline"); w.append(el("span", "", "a partir de"));
+      const t = el("input"); t.type = "time"; t.id = "h-" + key; t.value = a.horario || ""; t.step = 900;
+      t.onchange = () => save({ horario: t.value });
+      w.append(t); st.append(w);
+    } else if (a.status === "nao") {
+      const w = el("span", "inline");
+      const t = el("input"); t.type = "text"; t.id = "x-" + key; t.placeholder = "Sua desculpa esfarrapada"; t.maxLength = 160;
+      t.value = a.desculpa || ""; t.setAttribute("aria-label", "Desculpa");
+      t.onchange = () => save({ desculpa: t.value.trim() });
+      const dice = el("button", "dice", "Rolar desculpa"); dice.type = "button"; dice.id = "dice-" + key;
+      dice.onclick = () => { const e = EXCUSES[Math.floor(Math.random() * EXCUSES.length)]; save({ desculpa: e }); render(); };
+      w.append(t, dice); st.append(w);
+    }
+  } else {
+    if (a.status === "sim") {
+      st.append(el("span", "st sim", "Pode"));
+      st.append(el("span", "time", a.horario ? "a partir de " + a.horario : "horário livre"));
+    } else if (a.status === "nao") {
+      st.append(el("span", "st nao", "Não pode"));
+      st.append(el("span", "excuse", a.desculpa ? "“" + a.desculpa + "”" : "nem deu desculpa…"));
+    } else st.append(el("span", "st pend", "Ainda não respondeu"));
+  }
+  r.append(st);
+  return r;
+}
+
+function render() {
+  // keep focus and in-progress typing across live updates
+  const act = document.activeElement, actId = act && act.id, typing = act && act.tagName === "INPUT" && act.type === "text" ? { v: act.value, s: act.selectionStart } : null;
+  $("#add-sec").hidden = !canWrite || !db;
+  const list = $("#list"), past = $("#past-list");
+  if (!db) return;
+  if (!loaded.s || !loaded.r) return;
+  list.innerHTML = ""; past.innerHTML = "";
+  if (!me) { const n = el("div", "notice", "Escolha seu nome acima para marcar sua presença."); list.append(n); }
+  const today = todayISO();
+  const all = [...sessions.values()].sort((x, y) => x.data.localeCompare(y.data));
+  const up = all.filter((s) => s.data >= today), old = all.filter((s) => s.data < today).reverse();
+  let best = null, bestScore = -1;
+  up.forEach((s) => { const sm = summary(s.data); if (sm.yes > bestScore && sm.yes >= 2) { bestScore = sm.yes; best = s.data; } });
+  if (!up.length) {
+    const e = el("div", "empty"); e.innerHTML = "<strong>Nenhuma data proposta</strong>";
+    e.append(canWrite ? "Use “Propor uma data” acima para abrir a primeira sessão." : "Assim que alguém propor uma data, ela aparece aqui.");
+    list.append(e);
+  }
+  up.forEach((s) => list.append(card(s.data, s, s.data === best)));
+  old.forEach((s) => past.append(card(s.data, s, false)));
+  $("#past").hidden = !old.length;
+  if (actId) {
+    const n = document.getElementById(actId);
+    if (n) { n.focus(); if (typing && n.type === "text") { n.value = typing.v; try { n.setSelectionRange(typing.s, typing.s); } catch (e) {} } }
+  }
+}
+
+$("#add-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const v = $("#new-date").value;
+  if (!v) return;
+  if (sessions.has(v)) { $("#add-status").textContent = "Essa data já está no quadro."; return; }
+  $("#add-btn").disabled = true;
+  try { await write("sessoes/" + v, { data: v, modo: "" }); $("#add-status").textContent = "Data adicionada."; $("#new-date").value = ""; }
+  catch (e) {}
+  $("#add-btn").disabled = false;
+});
+
+renderPeople();
+$("#new-date").min = todayISO();
+
+(async () => {
+  const timer = setTimeout(() => { if (!loaded.s || !loaded.r) showNotice("O quadro ainda não respondeu. Confira sua conexão; ele carrega sozinho quando voltar.", true); }, 10000);
+  db = await (window.claude?.use ? window.claude.use("db") : null);
+  if (!db) {
+    clearTimeout(timer);
+    $("#add-sec").hidden = true;
+    $("#list").innerHTML = '<div class="empty"><strong>Quadro indisponível aqui</strong>Abra este link no claude.ai com sua conta conectada para ver e marcar as datas.</div>';
+    return;
+  }
+  try {
+    const user = await window.claude.use("user");
+    const cw = user ? await user.can("data.write") : null;
+    if (cw === false) canWrite = false;
+  } catch (e) {}
+  const done = () => { if (loaded.s && loaded.r) { clearTimeout(timer); showNotice(canWrite ? "" : "Você só pode ver este quadro. Peça ao Carlos acesso de Colaborador para marcar presença.", !canWrite); render(); } };
+  db.collection("sessoes").onSnapshot((snap) => {
+    sessions = new Map(snap.docs.map((d) => [d.id, { data: d.id, modo: "", ...d.data() }]));
+    if (!snap.metadata.fromCache) loaded.s = true; else loaded.s = loaded.s || snap.size > 0;
+    done(); render();
+  }, () => { loaded.s = true; showNotice("Perdemos a conexão com o quadro. Recarregue a página.", true); });
+  db.collection("respostas").onSnapshot((snap) => {
+    answers = new Map(snap.docs.map((d) => [d.id, d.data()]));
+    if (!snap.metadata.fromCache) loaded.r = true; else loaded.r = loaded.r || snap.size > 0;
+    done(); render();
+  }, () => { loaded.r = true; showNotice("Perdemos a conexão com o quadro. Recarregue a página.", true); });
+})();
+</script>
